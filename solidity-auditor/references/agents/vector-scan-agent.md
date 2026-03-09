@@ -20,7 +20,9 @@ only job is to return findings as text.
    `Read(file, offset=1000, limit=1000)`, etc.). Do NOT read without a limit.
    These are your ONLY file reads — do NOT read any other file after this step.
 
-2. **Triage pass.** For each vector, classify into three tiers:
+2. **Triage pass.** If a `## Constraints` section is present at the top of your bundle, use it to fast-track Skip classification. For example, if `cross_chain: false`, skip all cross-chain/bridge vectors without further analysis. If `standards: [ERC20]`, skip ERC721/ERC1155/ERC4626-specific vectors. Constraints describe codebase properties, not security assumptions. Code overrides constraints — classify based on what the code actually contains.
+
+   For each vector, classify into three tiers:
    - **Skip** — the named construct AND underlying concept are both absent
    - **Borderline** — the named construct is absent but the underlying
      vulnerability concept could manifest through a different mechanism

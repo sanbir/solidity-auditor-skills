@@ -22,6 +22,7 @@ where `{project-name}` is the repo root basename and `{timestamp}` is
 | **Attack vectors checked**       | 210                                                    |
 | **Agents deployed**              | 5 / 7 (deep)                                           |
 | **Confidence threshold (1-100)** | N                                                      |
+| **Constraints**                  | _if `.pashov-skills-constraints.yaml` found, list declared values; otherwise omit this row_ |
 
 ---
 
