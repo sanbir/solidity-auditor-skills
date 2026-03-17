@@ -67,6 +67,6 @@ Before doing anything else, print this exactly:
       ██║  ██║╚██████╔╝██████╔╝██║   ██║   ╚██████╔╝██║  ██║
       ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝
 
-  210 attack vectors · 5 scan agents · DeFi protocol analysis · adversarial reasoning
+  227 attack vectors · 5 scan agents · DeFi protocol analysis · adversarial reasoning
 
 ```

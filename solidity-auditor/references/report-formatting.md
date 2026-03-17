@@ -19,7 +19,7 @@ where `{project-name}` is the repo root basename and `{timestamp}` is
 | -------------------------------- | ------------------------------------------------------ |
 | **Mode**                         | ALL / default / filename                               |
 | **Files reviewed**               | `File1.sol` · `File2.sol`<br>`File3.sol` · `File4.sol` |
-| **Attack vectors checked**       | 210                                                    |
+| **Attack vectors checked**       | 227                                                    |
 | **Agents deployed**              | 5 / 7 (deep)                                           |
 | **Confidence threshold (1-100)** | N                                                      |
 | **Constraints**                  | _if `.pashov-skills-constraints.yaml` found, list declared values; otherwise omit this row_ |

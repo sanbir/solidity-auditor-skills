@@ -1,6 +1,6 @@
 # Solidity Auditor
 
-The ultimate AI-powered security audit skill for Solidity — 210 attack vectors, 5 parallel scan agents, adversarial reasoning, and DeFi protocol analysis.
+The ultimate AI-powered security audit skill for Solidity — 227 attack vectors, 5 parallel scan agents, adversarial reasoning, and DeFi protocol analysis.
 
 Built for:
 
@@ -12,8 +12,8 @@ Not a substitute for a formal audit — but the most comprehensive AI check you 
 
 ## What's Inside
 
-- **210 attack vectors** across 5 reference files — covering reentrancy, access control, arithmetic, ERC token standards, proxies, cross-chain (LayerZero), DeFi protocols, L2 considerations, flash loans, oracle manipulation, assembly pitfalls, and more
-- **5 parallel vector-scan agents** — each assigned ~42 vectors, scanning the full codebase simultaneously
+- **227 attack vectors** across 5 reference files — covering reentrancy, access control, arithmetic, ERC token standards, proxies, cross-chain (LayerZero), DeFi protocols, L2 considerations, flash loans, oracle manipulation, assembly pitfalls, and more
+- **5 parallel vector-scan agents** — each assigned ~45 vectors, scanning the full codebase simultaneously
 - **Adversarial reasoning agent** (DEEP mode) — free-form exploit hunting using Feynman questioning, state inconsistency analysis, and invariant hunting
 - **DeFi protocol agent** (DEEP mode) — domain-specific checklists for lending, AMM/DEX, ERC-4626 vaults, staking, bridges, governance, proxies, and account abstraction (ERC-4337)
 - **False-positive gate** — every finding must pass 3 checks (concrete path, reachable entry point, no existing guard)

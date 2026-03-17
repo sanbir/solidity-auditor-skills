@@ -1,6 +1,6 @@
 # Solidity Auditor Skills
 
-> The ultimate Claude Code skill for Solidity smart contract security auditing — 210 attack vectors, 7 parallel agents, DeFi protocol checklists, and adversarial reasoning.
+> The ultimate Claude Code skill for Solidity smart contract security auditing — 227 attack vectors, 7 parallel agents, DeFi protocol checklists, and adversarial reasoning.
 
 Forked from [pashov/skills](https://github.com/pashov/skills) and extended with knowledge aggregated from 20+ open-source audit skill repositories.
 
@@ -12,11 +12,11 @@ Forked from [pashov/skills](https://github.com/pashov/skills) and extended with 
 
 This repo builds on Pashov Audit Group's excellent [solidity-auditor](https://github.com/pashov/skills) skill — the same 4-turn orchestration, the same FP gate, the same report format. Everything below is additive; nothing from the original was removed.
 
-### +40 Attack Vectors (170 → 210)
+### +57 Attack Vectors (170 → 227)
 
 Pashov's 170 vectors are the best publicly available collection of Solidity attack patterns. They cover syntactic/structural bugs comprehensively — reentrancy variants, proxy pitfalls, ERC standard edge cases, assembly traps, cross-chain messaging, and more.
 
-The 40 new vectors (V171–V210) target gaps in three areas:
+The 57 new vectors (V171–V227) target gaps in three areas:
 
 **DeFi protocol economics (V171–V179, V185–V189, V192).** Liquidation mechanics are the #1 source of high-severity findings in Sherlock and Code4rena lending protocol contests. Pashov touches this with V41 (dust positions) and V43 (self-liquidation), but the broader class — insufficient liquidation incentives, cherry-picked collateral seizure, interest accrual during pause, liquidation bonus exceeding available collateral, multi-decimal confusion in liquidation math — was not covered. These bugs are behavioral and economic, not syntactic, which is why pattern-matching agents miss them.
 
@@ -43,7 +43,7 @@ This catches an entirely different class of bugs than vector scanning. "Does thi
 
 ### +1 Scan Agent (4 → 5 vector-scan agents)
 
-210 vectors distributed across 5 agents (~42 each) instead of 170 across 4. Same per-agent cognitive load, better parallelism.
+227 vectors distributed across 5 agents (~45 each) instead of 170 across 4. Same per-agent cognitive load, better parallelism.
 
 ### Enhanced Adversarial Reasoning Agent
 
@@ -103,13 +103,13 @@ cp -r solidity-auditor/ ~/.cursor/skills/solidity-auditor
 
 | Skill | Description |
 | --- | --- |
-| [solidity-auditor](solidity-auditor/) | 210-vector security audit with 5–7 parallel agents, DeFi protocol checklists, and adversarial reasoning |
+| [solidity-auditor](solidity-auditor/) | 227-vector security audit with 5–7 parallel agents, DeFi protocol checklists, and adversarial reasoning |
 
 ---
 
 ## What's Included
 
-### 210 Attack Vectors (5 reference files)
+### 227 Attack Vectors (5 reference files)
 
 | File | Vectors | Focus Areas |
 | --- | --- | --- |
@@ -117,13 +117,13 @@ cp -r solidity-auditor/ ~/.cursor/skills/solidity-auditor
 | [attack-vectors-2](solidity-auditor/references/attack-vectors/attack-vectors-2.md) | 43–84 | Liquidation, overflow/underflow, diamond proxies, force-fed ETH, oracle pricing, ERC4626 rounding, Chainlink, fee-on-transfer, Merkle trees, rebasing tokens |
 | [attack-vectors-3](solidity-auditor/references/attack-vectors/attack-vectors-3.md) | 85–126 | Assembly pitfalls, flash loans, governance hijacks, transient storage (EIP-1153), cross-contract reentrancy, proxy initialization, minimal proxies, slippage |
 | [attack-vectors-4](solidity-auditor/references/attack-vectors/attack-vectors-4.md) | 127–170 | Cross-chain replay, TWAP manipulation, Merkle reuse, bridge security, DVN diversity, L2 sequencer, 63/64 gas rule, storage layout, metamorphic contracts, calldata malleability |
-| [attack-vectors-5](solidity-auditor/references/attack-vectors/attack-vectors-5.md) | 171–210 | DeFi liquidation economics, staking reward griefing, L2 sequencer grace periods, interest accrual edge cases, Uniswap V4 hooks, OZ v4/v5 confusion, behavioral vulnerabilities |
+| [attack-vectors-5](solidity-auditor/references/attack-vectors/attack-vectors-5.md) | 171–227 | DeFi liquidation economics, staking reward griefing, L2 sequencer grace periods, interest accrual edge cases, Uniswap V4 hooks, OZ v4/v5 confusion, EIP-7702, restaking, infrastructure compromise, behavioral vulnerabilities |
 
 ### 3 Specialized Agents
 
 | Agent | Mode | Model | Approach |
 | --- | --- | --- | --- |
-| Vector Scan (x5) | Default + Deep | Sonnet | Systematic triage of ~42 vectors each against full codebase |
+| Vector Scan (x5) | Default + Deep | Sonnet | Systematic triage of ~45 vectors each against full codebase |
 | Adversarial Reasoning | Deep only | Opus | Free-form exploit hunting with Feynman questioning and invariant analysis |
 | DeFi Protocol | Deep only | Opus | Domain-specific checklists for lending, AMM, vaults, staking, bridges, governance, proxies, ERC-4337 |
 

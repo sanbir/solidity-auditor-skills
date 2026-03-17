@@ -1,6 +1,6 @@
 # Attack Vectors Reference (5/5)
 
-210 total attack vectors — Extended patterns from DeFi protocol analysis, L2 considerations, and behavioral vulnerabilities
+227 total attack vectors — Extended patterns from DeFi protocol analysis, L2 considerations, behavioral vulnerabilities, EIP-7702, restaking, and modern attack surfaces
 
 ---
 
@@ -215,3 +215,92 @@
 
 - **D:** Upgradeable contract calls `__Ownable_init()` but forgets to call `__ReentrancyGuard_init()`, `__Pausable_init()`, or other inherited initializers. Reentrancy guard status is 0 (uninitialized), which may not provide protection. Pausable state is unpredictable.
 - **FP:** All inherited `__*_init()` functions called in `initialize()`. OZ Upgradeable contracts used with complete initialization chain. Tests verify all state correctly initialized post-deployment.
+
+---
+
+---
+
+**211. EIP-7702 Cross-Chain Delegation Replay**
+
+- **D:** EIP-7702 authorization signatures for EOA-to-contract delegation miss `chainId` in the signed tuple. Attacker replays the same delegation signature on another chain, hijacking the EOA's execution context on chains the user never intended to delegate on.
+- **FP:** `chainId` included in EIP-7702 authorization tuple. Wallet UI displays target chain before signing. Per-chain delegation with separate signatures.
+
+**212. EIP-7702 Delegate Hijacking**
+
+- **D:** Malicious contract becomes an EOA's delegate via social engineering or phishing. Once delegated, all transactions to the EOA execute the malicious contract's code in the EOA's context — draining funds, approving tokens, or modifying state. Persists until the user explicitly revokes delegation.
+- **FP:** Delegation target is a well-known, audited contract (e.g., Safe module). Wallet prompts clearly distinguish delegation from normal signing. Revocation mechanism is accessible and documented. Time-limited delegation with automatic expiry.
+
+**213. EIP-7702 Delegation Phishing**
+
+- **D:** User is socially engineered into signing what appears to be a normal typed-data message, but is actually an EIP-7702 authorization tuple. Once submitted, any subsequent transaction to the user's EOA executes attacker-controlled code. Unlike approval phishing, this controls ALL future interactions with the EOA.
+- **FP:** Wallet UI clearly distinguishes EIP-7702 delegation requests from standard EIP-712 messages. Warning displayed for delegation to unverified contracts. Transaction simulation shows delegation effect before signing.
+
+**214. EIP-7702 EOA Nested Reentrancy**
+
+- **D:** With EIP-7702, EOAs can have code. A delegated EOA receiving ETH or tokens triggers fallback/receive in the delegate contract, creating new reentrancy surfaces that didn't exist when the counterparty was a plain EOA. Protocols assuming EOAs can't have callbacks are vulnerable.
+- **FP:** `nonReentrant` on all external-call-bearing functions regardless of counterparty type. No assumption that `tx.origin == msg.sender` means "safe EOA." CEI pattern followed universally.
+
+**215. ERC-4337 Paymaster Drain via Crafted UserOperations**
+
+- **D:** Attacker crafts UserOperations that pass paymaster validation but consume maximum gas during execution. Paymaster pays for gas but the operation accomplishes nothing useful for the paymaster's business model. Repeated submissions drain the paymaster's deposit in the EntryPoint.
+- **FP:** Paymaster validates operation purpose (not just signature). Gas limits per UserOperation and per-user rate limits enforced. Paymaster deposit monitored with automatic pause at low threshold. Off-chain simulation before on-chain validation.
+
+**216. ERC-4337 Validation-Execution Phase Confusion**
+
+- **D:** Logic that should only run during validation phase (signature checks, nonce verification) executes during the execution phase or vice versa. Banned opcodes in validation (ERC-7562) cause bundler rejection, while missing validation in execution allows unauthorized operations.
+- **FP:** Clear separation between `validateUserOp` and execution functions. No storage access in validation beyond sender's associated storage. Compliance with ERC-7562 opcode restrictions verified. Bundler simulation tests pass.
+
+**217. Uniswap V4 Hook Data Manipulation**
+
+- **D:** Hook reads parameters from `hookData` bytes passed through the swap path. Attacker crafts `hookData` to manipulate hook behavior — bypassing fee calculations, altering routing decisions, or triggering unintended state changes in the hook contract.
+- **FP:** `hookData` validated against expected schema (length, types). Critical parameters derived from pool state, not `hookData`. Hook ignores or doesn't use `hookData`. Authenticated `hookData` (signed by trusted relayer).
+
+**218. Known Solidity Compiler Bug Exploitation**
+
+- **D:** Contract compiled with a Solidity version containing a known CVE or documented compiler bug (e.g., ABI encoding bugs, optimizer errors, memory corruption). The specific code patterns in the contract trigger the bug, producing incorrect bytecode that behaves differently from source-level semantics.
+- **FP:** Compiler version checked against https://docs.soliditylang.org/en/latest/bugs.html. Version is latest stable or a version where known bugs don't affect patterns used. `forge inspect` or `slither --detect solc-version` run. No vulnerable code patterns present for the specific compiler bugs.
+
+**219. Unsafe ABI Decoding of Untrusted Calldata**
+
+- **D:** Raw `abi.decode(data, (...))` called on user-supplied or cross-contract calldata without length or schema validation. Truncated, malformed, or oversized payloads cause unexpected reverts, type confusion, or silent misinterpretation of parameters. In assembly-based decoders, out-of-bounds reads return zero.
+- **FP:** `data.length >= expectedMinLength` checked before decoding. `try/catch` wrapping untrusted decode. Assembly decoders validate bounds. Only trusted internal calldata decoded without checks.
+
+**220. Donation Attack on Balance-Based Vault Accounting**
+
+- **D:** Vault uses `token.balanceOf(address(this))` as `totalAssets` instead of internal accounting. Attacker donates tokens directly (bypassing `deposit()`), inflating the share price. Subsequent depositors receive fewer shares than expected. Combined with flash loans, enables share price manipulation for profit extraction.
+- **FP:** Internal `totalAssets` tracking updated only via `deposit()`/`withdraw()`. `balanceOf` never used for share price calculation. Virtual assets/shares offset applied. Donation amount ignored or swept separately.
+
+**221. LP Token Price Manipulation via Reserve Ratio**
+
+- **D:** Protocol prices LP tokens using `reserve0 * price0 + reserve1 * price1 / totalSupply` — directly reading pool reserves that are manipulable via flash loans. Attacker skews reserves in a single transaction, inflates LP token value, uses overpriced LP as collateral, borrows against it.
+- **FP:** LP token pricing uses invariant-based formula (Alpha Homora fair LP pricing). Reserves not read directly — price derived from oracle prices and the constant-product invariant. TWAP-based LP valuation. Flash loan resistant pricing.
+
+**222. Circular Flash Loan Amplification Across Protocols**
+
+- **D:** Attacker uses flash-loaned assets to deposit in Protocol A, borrows from A, deposits borrowed assets in Protocol B, borrows from B, and repeats. Creates leveraged positions across multiple protocols in a single transaction with zero initial capital, amplifying any exploit (oracle manipulation, governance attack) by orders of magnitude.
+- **FP:** Flash loan detection via `require(block.number > depositBlock)` or same-block withdrawal restriction. Cross-protocol exposure limits. Deposit cooldown periods. Conservative LTV ratios that make circular amplification unprofitable after fees.
+
+**223. Off-Chain Infrastructure Compromise (Frontend/Signer)**
+
+- **D:** Frontend UI, signer service, npm dependency, or multisig wallet interface is compromised. Users interact with a legitimate-looking but attacker-controlled interface that crafts malicious transactions (different calldata than displayed). The on-chain contracts are correct but users are tricked into signing harmful transactions. Classic pattern: Bybit $1.4B (2025) via compromised Safe{Wallet} UI.
+- **FP:** Transaction simulation shown in wallet before signing. Calldata decoded and displayed in human-readable form. Subresource integrity (SRI) headers on frontend. Reproducible builds. Multi-party verification of transaction calldata before multisig signing. Hardware wallet with on-device transaction parsing.
+
+**224. Embedded Library Code Missing Security Patches**
+
+- **D:** Contract contains copy-pasted library source code (e.g., OpenZeppelin, Solmate) instead of importing from a versioned dependency. When the library publishes security fixes, the embedded copy remains vulnerable. The vulnerability is invisible in dependency audits since no import exists to version-check.
+- **FP:** All library code imported from versioned npm/git dependencies. No copy-pasted external code in project source. Dependency versions pinned and regularly updated. Custom modifications to libraries documented and tracked.
+
+**225. Restaking Cascading Slashing Risk (EigenLayer-style)**
+
+- **D:** Same stake secures multiple AVSs (Actively Validated Services) via restaking. A slashing event in one AVS can cascade — the same ETH is slashed by AVS-A, then AVS-B detects reduced stake and triggers its own slashing condition. Total slashing across all registered AVSs can exceed 100% of the original stake, creating insolvency.
+- **FP:** Maximum aggregate slash exposure capped across all AVSs. Slashing amounts deducted from future AVS registrations. Insurance or reserve fund for cascading scenarios. Per-AVS stake isolation. Slashing events rate-limited across AVSs.
+
+**226. Queue/List Poisoning via Dust Entries**
+
+- **D:** Attacker fills a withdrawal queue, reward distribution list, or processing queue with thousands of dust-amount entries (1 wei each). Processing the queue requires iterating all entries, and the gas cost grows linearly. Eventually the queue becomes too expensive to process within block gas limits, permanently blocking legitimate withdrawals.
+- **FP:** Minimum entry size enforced (`require(amount >= MIN_AMOUNT)`). Queue implements pagination/batch processing. Economic deterrent per queue entry (fee or deposit). Admin can prune dust entries. Max queue length enforced.
+
+**227. Governance Spam Proposals via Low Deposit Threshold**
+
+- **D:** Governance proposal creation requires a deposit or token threshold too low relative to token supply. Attacker floods governance with spam proposals, overwhelming voters and hiding malicious proposals among noise. Legitimate governance activity becomes impractical. Combined with voter apathy, a malicious proposal may pass unnoticed.
+- **FP:** Proposal deposit proportional to token supply (e.g., 1% of total supply). Proposal rate limiting per address. Quorum requirements filter out low-engagement proposals. Proposal screening by guardians/council before on-chain vote. Deposit forfeited if proposal doesn't reach quorum.
