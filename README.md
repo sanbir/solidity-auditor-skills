@@ -1,6 +1,6 @@
 # Solidity Auditor Skills
 
-> The ultimate Claude Code skill for Solidity smart contract security auditing — 227 attack vectors, 7 parallel agents, DeFi protocol checklists, and adversarial reasoning.
+> The ultimate Claude Code skill for Solidity smart contract security auditing — 229 attack vectors, 7 parallel agents, DeFi protocol checklists, and adversarial reasoning.
 
 Forked from [pashov/skills](https://github.com/pashov/skills) and extended with knowledge aggregated from 20+ open-source audit skill repositories.
 
@@ -103,21 +103,21 @@ cp -r solidity-auditor/ ~/.cursor/skills/solidity-auditor
 
 | Skill | Description |
 | --- | --- |
-| [solidity-auditor](solidity-auditor/) | 227-vector security audit with 5–7 parallel agents, DeFi protocol checklists, and adversarial reasoning |
+| [solidity-auditor](solidity-auditor/) | 229-vector security audit with 5–7 parallel agents, DeFi protocol checklists, and adversarial reasoning |
 
 ---
 
 ## What's Included
 
-### 227 Attack Vectors (5 reference files)
+### 229 Attack Vectors (5 reference files)
 
 | File | Vectors | Focus Areas |
 | --- | --- | --- |
 | [attack-vectors-1](solidity-auditor/references/attack-vectors/attack-vectors-1.md) | 1–42 | Signatures, ERC721/1155, snapshots, timestamps, proxies, LayerZero, msg.value, access control, CREATE2, reentrancy callbacks |
-| [attack-vectors-2](solidity-auditor/references/attack-vectors/attack-vectors-2.md) | 43–84 | Liquidation, overflow/underflow, diamond proxies, force-fed ETH, oracle pricing, ERC4626 rounding, Chainlink, fee-on-transfer, Merkle trees, rebasing tokens |
-| [attack-vectors-3](solidity-auditor/references/attack-vectors/attack-vectors-3.md) | 85–126 | Assembly pitfalls, flash loans, governance hijacks, transient storage (EIP-1153), cross-contract reentrancy, proxy initialization, minimal proxies, slippage |
-| [attack-vectors-4](solidity-auditor/references/attack-vectors/attack-vectors-4.md) | 127–170 | Cross-chain replay, TWAP manipulation, Merkle reuse, bridge security, DVN diversity, L2 sequencer, 63/64 gas rule, storage layout, metamorphic contracts, calldata malleability |
-| [attack-vectors-5](solidity-auditor/references/attack-vectors/attack-vectors-5.md) | 171–227 | DeFi liquidation economics, staking reward griefing, L2 sequencer grace periods, interest accrual edge cases, Uniswap V4 hooks, OZ v4/v5 confusion, EIP-7702, restaking, infrastructure compromise, behavioral vulnerabilities |
+| [attack-vectors-2](solidity-auditor/references/attack-vectors/attack-vectors-2.md) | 43–83 | Liquidation, overflow/underflow, diamond proxies, force-fed ETH, oracle pricing, ERC4626 rounding, Chainlink, fee-on-transfer, Merkle trees, rebasing tokens |
+| [attack-vectors-3](solidity-auditor/references/attack-vectors/attack-vectors-3.md) | 84–125 | Assembly pitfalls, flash loans, governance hijacks, transient storage (EIP-1153), cross-contract reentrancy, proxy initialization, minimal proxies, slippage |
+| [attack-vectors-4](solidity-auditor/references/attack-vectors/attack-vectors-4.md) | 126–167 | Cross-chain replay, TWAP manipulation, Merkle reuse, bridge security, DVN diversity, L2 sequencer, 63/64 gas rule, storage layout, metamorphic contracts, calldata malleability |
+| [attack-vectors-5](solidity-auditor/references/attack-vectors/attack-vectors-5.md) | 168–229 | DeFi liquidation economics, staking reward griefing, L2 sequencer grace periods, interest accrual edge cases, Uniswap V4 hooks, OZ v4/v5 confusion, EIP-7702, restaking, infrastructure compromise, behavioral vulnerabilities, permit edge cases, sender abstraction, native ETH flows |
 
 ### 3 Specialized Agents
 
