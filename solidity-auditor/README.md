@@ -2,6 +2,8 @@
 
 A security agent for **Solidity and EVM systems**.
 
+Attribution: this fork keeps the v2 packaging and audit workflow lineage from [pashov/skills](https://github.com/pashov/skills), then extends the Solidity corpus further.
+
 Built for:
 
 - **Solidity developers** who want fast security feedback before every commit

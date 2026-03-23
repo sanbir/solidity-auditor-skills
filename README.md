@@ -2,6 +2,8 @@
 
 > AI-powered Solidity security skills for EVM systems, with expanded coverage for DeFi, account abstraction, proxies, signatures, bridges, and execution-layer edge cases.
 
+This fork explicitly builds on [pashov/skills](https://github.com/pashov/skills) v2, extending the upstream Solidity workflow with additional EVM vectors and repo-specific coverage.
+
 **Supported AI Platforms:**
 [![Claude Code](https://img.shields.io/badge/Claude_Code-F5E6D0?style=for-the-badge&logo=anthropic&logoColor=1a1a1a)](https://claude.ai/download)
 [![Cursor](https://img.shields.io/badge/Cursor-000000?style=for-the-badge&logo=cursor&logoColor=white)](https://cursor.com)
