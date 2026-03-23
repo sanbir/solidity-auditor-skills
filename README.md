@@ -43,13 +43,13 @@ It is tuned for vulnerabilities that show up in real EVM systems and are easy to
 - non-standard token integration quirks
 - low-level call, returndata, gas-griefing, and execution-order issues
 
-The v2 refresh also pulls in additional attack vectors from the upstream pashov-skills corpus while keeping this repo deduplicated and EVM-specific.
+The v3 refresh adopts the pashov-skills v2 8-agent architecture (vector-scan, math-precision, access-control, economic-security, execution-trace, invariant, periphery, first-principles) and merges new attack vectors from upstream while keeping this repo deduplicated and EVM-specific.
 
 ## Skills
 
 | Skill | Description |
 | --- | --- |
-| [solidity-auditor](solidity-auditor/) | Fast security feedback for Solidity systems with broad EVM, DeFi, proxy, signature, bridge, and token-integration coverage. |
+| [solidity-auditor](solidity-auditor/) | 8 specialized parallel agents (321 vectors) for Solidity security with broad EVM, DeFi, proxy, signature, bridge, and token-integration coverage. |
 
 ---
 

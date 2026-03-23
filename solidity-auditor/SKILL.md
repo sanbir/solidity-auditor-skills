@@ -1,23 +1,23 @@
 ---
 name: solidity-auditor
-description: Security audit of Solidity code while you develop. Trigger on "audit", "check this contract", "review for security". Modes - default (full repo), DEEP (+ adversarial reasoning + DeFi protocol agent), or a specific filename.
+description: Security audit of Solidity code while you develop. Trigger on "audit", "check this contract", "review for security". Modes - default (full repo), DEEP (+ DeFi protocol agent), or a specific filename.
 ---
 
 # Smart Contract Security Audit
 
-You are the orchestrator of a parallelized smart contract security audit. Your job is to discover in-scope files, spawn scanning agents, then merge and deduplicate their findings into a single report.
+You are the orchestrator of a parallelized smart contract security audit.
 
 ## Mode Selection
 
-**Exclude pattern** (applies to all modes): skip directories `interfaces/`, `lib/`, `mocks/`, `test/` and files matching `*.t.sol`, `*Test*.sol` or `*Mock*.sol`.
+**Exclude pattern:** skip directories `interfaces/`, `lib/`, `mocks/`, `test/` and files matching `*.t.sol`, `*Test*.sol` or `*Mock*.sol`.
 
-- **Default** (no arguments): scan all `.sol` files using the exclude pattern. Use Bash `find` (not Glob) to discover files.
-- **deep**: same scope as default, but also spawns the adversarial reasoning agent (Agent 5) and the DeFi protocol agent (Agent 6). Use for thorough reviews. Slower and more costly.
+- **Default** (no arguments): scan all `.sol` files using the exclude pattern. Use Bash `find` (not Glob).
+- **deep**: same scope as default, but also spawns the DeFi protocol agent (Agent 9, opus). Use for thorough reviews. Slower and more costly.
 - **`$filename ...`**: scan the specified file(s) only.
 
 **Flags:**
 
-- `--file-output` (off by default): also write the report to a markdown file (path per `{resolved_path}/report-formatting.md`). Without this flag, output goes to the terminal only. Never write a report file unless the user explicitly passes `--file-output`.
+- `--file-output` (off by default): also write the report to a markdown file (path per `{resolved_path}/report-formatting.md`). Never write a report file unless explicitly passed.
 
 ## Constraints (optional)
 
@@ -36,17 +36,70 @@ account_abstraction: false         # no ERC-4337 / smart account logic
 
 ## Orchestration
 
-**Turn 1 — Discover.** Print the banner, then in the same message make parallel tool calls: (a) Bash `find` for in-scope `.sol` files per mode selection, (b) Glob for `**/references/attack-vectors/attack-vectors-1.md` and extract the `references/` directory path (two levels up), (c) Read `.pashov-skills-constraints.yaml` from the repository root (if not found, continue without constraints). Use this resolved path as `{resolved_path}` for all subsequent references.
+**Turn 1 — Discover.** Print the banner, then make these parallel tool calls in one message:
 
-**Turn 2 — Prepare.** In a single message, make three parallel tool calls: (a) Read `{resolved_path}/agents/vector-scan-agent.md`, (b) Read `{resolved_path}/report-formatting.md`, (c) Bash: create five per-agent bundle files (`/tmp/audit-agent-{1,2,3,4,5}-bundle.md`) in a **single command** — if constraints were found in Turn 1, each bundle starts with a `## Constraints` section containing the raw YAML content; then concatenate **all** in-scope `.sol` files (with `### path` headers and fenced code blocks), then `{resolved_path}/judging.md`, then `{resolved_path}/report-formatting.md`, then `{resolved_path}/attack-vectors/attack-vectors-N.md`; print line counts. Every agent receives the full codebase — only the attack-vectors file differs per agent. Do NOT read or inline any file content into agent prompts — the bundle files replace that entirely.
+a. Bash `find` for in-scope `.sol` files per mode selection
+b. Glob for `**/references/attack-vectors/attack-vectors-1.md` — extract the `references/` directory (two levels up) as `{resolved_path}`
+c. ToolSearch `select:Agent`
+d. Read the local `VERSION` file from the same directory as this skill
+e. Bash `curl -sf https://raw.githubusercontent.com/sanbir/solidity-auditor-skills/main/solidity-auditor/VERSION`
+f. Bash `mktemp -d /tmp/audit-XXXXXX` — store as `{bundle_dir}`
+g. Read `.pashov-skills-constraints.yaml` from the repository root (if not found, continue without constraints)
 
-**Turn 3 — Spawn.** In a single message, spawn all agents as parallel foreground Agent tool calls (do NOT use `run_in_background`). Always spawn Agents 1–5. Only spawn Agents 6 and 7 when the mode is **DEEP**.
+If the remote VERSION fetch succeeds and differs from local, print `⚠️ You are not using the latest version. Please upgrade for best security coverage. See https://github.com/sanbir/solidity-auditor-skills`. If it fails, skip silently.
 
-- **Agents 1–5** (vector scanning) — spawn with `model: "sonnet"`. Each agent prompt must contain the full text of `vector-scan-agent.md` (read in Turn 2, paste into every prompt). After the instructions, add: `Your bundle file is /tmp/audit-agent-N-bundle.md (XXXX lines).` (substitute the real line count).
-- **Agent 6** (adversarial reasoning, DEEP only) — spawn with `model: "opus"`. Receives the in-scope `.sol` file paths and the instruction: your reference directory is `{resolved_path}`. If constraints were found in Turn 1, also include: the constraints file is at `.pashov-skills-constraints.yaml` in the repository root. Read `{resolved_path}/agents/adversarial-reasoning-agent.md` for your full instructions.
-- **Agent 7** (DeFi protocol analysis, DEEP only) — spawn with `model: "opus"`. Receives the in-scope `.sol` file paths and the instruction: your reference directory is `{resolved_path}`. Read `{resolved_path}/agents/defi-protocol-agent.md` for your full instructions.
+**Turn 2 — Prepare.** In one message, make parallel tool calls: (a) Read `{resolved_path}/report-formatting.md`, (b) Read `{resolved_path}/judging.md`.
 
-**Turn 4 — Report.** Merge all agent results: deduplicate by root cause (keep the higher-confidence version), sort by confidence highest-first, re-number sequentially, and insert the **Below Confidence Threshold** separator row. Print findings directly — do not re-draft or re-describe them. Use report-formatting.md (read in Turn 2) for the scope table and output structure. If constraints were loaded, add a **Constraints** row to the scope table showing the declared values. If `--file-output` is set, write the report to a file (path per report-formatting.md) and print the path.
+Then build all bundles in a single Bash command using `cat` (not shell variables or heredocs):
+
+1. `{bundle_dir}/source.md` — ALL in-scope `.sol` files, each with a `### path` header and fenced code block.
+2. Agent bundles = `source.md` + per-agent bundles with cat:
+
+| Bundle               | Appended files (relative to `{resolved_path}`)                                                                                                  |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `agent-1-bundle.md`  | `attack-vectors/attack-vectors-1.md` + `attack-vectors/attack-vectors-2.md` + `attack-vectors/attack-vectors-3.md` + `attack-vectors/attack-vectors-4.md` + `attack-vectors/attack-vectors-5.md` + `hacking-agents/vector-scan-agent.md` + `hacking-agents/shared-rules.md` |
+| `agent-2-bundle.md`  | `hacking-agents/math-precision-agent.md` + `hacking-agents/shared-rules.md`                                     |
+| `agent-3-bundle.md`  | `hacking-agents/access-control-agent.md` + `hacking-agents/shared-rules.md`                                     |
+| `agent-4-bundle.md`  | `hacking-agents/economic-security-agent.md` + `hacking-agents/shared-rules.md`                                  |
+| `agent-5-bundle.md`  | `hacking-agents/execution-trace-agent.md` + `hacking-agents/shared-rules.md`                                    |
+| `agent-6-bundle.md`  | `hacking-agents/invariant-agent.md` + `hacking-agents/shared-rules.md`                                          |
+| `agent-7-bundle.md`  | `hacking-agents/periphery-agent.md` + `hacking-agents/shared-rules.md`                                          |
+| `agent-8-bundle.md`  | `hacking-agents/first-principles-agent.md` + `hacking-agents/shared-rules.md`                                   |
+
+If constraints were found in Turn 1, prepend a `## Constraints` section containing the raw YAML content to every bundle.
+
+Print line counts for every bundle and `source.md`. Do NOT inline file content into agent prompts.
+
+**Turn 3 — Spawn.** In one message, spawn all agents as parallel foreground Agent calls. Always spawn Agents 1–8 with `model: "sonnet"`. Only spawn Agent 9 when the mode is **DEEP**.
+
+- **Agents 1–8** — spawn with `model: "sonnet"`. Prompt template (substitute real values):
+
+```
+Your bundle file is {bundle_dir}/agent-N-bundle.md (XXXX lines).
+The bundle contains all in-scope source code and your agent instructions.
+Read the bundle fully before producing findings.
+```
+
+- **Agent 9** (DeFi protocol analysis, DEEP only) — spawn with `model: "opus"`. Receives the in-scope `.sol` file paths and the instruction: your reference directory is `{resolved_path}`. If constraints were found in Turn 1, also include: the constraints file is at `.pashov-skills-constraints.yaml` in the repository root. Read `{resolved_path}/hacking-agents/defi-protocol-agent.md` for your full instructions.
+
+**Turn 4 — Deduplicate, validate & output.** Single-pass: deduplicate all agent results, gate-evaluate, and produce the final report in one turn. Do NOT print an intermediate dedup list — go straight to the report.
+
+1. **Deduplicate.** Parse every FINDING and LEAD from all agents. Group by `group_key` field (format: `Contract | function | bug-class`). Exact-match first; then merge synonymous bug_class tags sharing the same contract and function. Keep the best version per group, number sequentially, annotate `[agents: N]`.
+
+   Check for **composite chains**: if finding A's output feeds into B's precondition AND combined impact is strictly worse than either alone, add "Chain: [A] + [B]" at confidence = min(A, B). Most audits have 0–2.
+
+2. **Gate evaluation.** Run each deduplicated finding through the four gates in `judging.md` (do not skip or reorder). Evaluate each finding exactly once — do not revisit after verdict.
+
+   **Single-pass protocol:** evaluate every relevant code path ONCE in fixed order (constructor → setters → swap functions → mint → burn → liquidate). One-line verdict per path: `BLOCKS`, `ALLOWS`, `IRRELEVANT`, or `UNCERTAIN`. Commit after all paths — do not re-examine. `UNCERTAIN` = `ALLOWS`.
+
+3. **Lead promotion & rejection guardrails.**
+   - Promote LEAD → FINDING (confidence 75) if: complete exploit chain traced in source, OR `[agents: 2+]` demoted (not rejected) the same issue.
+   - `[agents: 2+]` does NOT override a concrete refutation — demote to LEAD if refutation is uncertain.
+   - No deployer-intent reasoning — evaluate what the code _allows_, not how the deployer _might_ use it.
+
+4. **Fix verification** (confidence ≥ 80 only): trace the attack with fix applied; verify no new DoS, reentrancy, or broken invariants (use `safeTransfer` not `require(token.transfer(...))`); list all locations if the pattern repeats. If no safe fix exists, omit it with a note.
+
+5. **Format and print** per `report-formatting.md`. Exclude rejected items. If `--file-output`: also write to file.
 
 ## Banner
 
@@ -67,6 +120,6 @@ Before doing anything else, print this exactly:
       ██║  ██║╚██████╔╝██████╔╝██║   ██║   ╚██████╔╝██║  ██║
       ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝
 
-  283 attack vectors · 5 scan agents · DeFi protocol analysis · adversarial reasoning
+  321 attack vectors · 8 specialized agents · DeFi protocol analysis
 
 ```

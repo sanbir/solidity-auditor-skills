@@ -1,4 +1,4 @@
-283 total attack vectors
+321 total attack vectors
 
 **168. L2 Sequencer Grace Period Missing**
 
@@ -656,3 +656,235 @@
 
 - **D:** Per-address withdrawal limit bypassed by transferring shares to fresh addresses — each gets a fresh limit.
 - **FP:** Limit tracks underlying position, not address. Shares non-transferable or transfer resets allowance.
+
+---
+
+---
+
+
+**284. EIP-7702 Whitelist / Allowlist Privilege Borrowing**
+
+- **D:** Whitelisted address signs EIP-7702 delegation. Attacker includes that authorization in their tx, calls the delegated address — target contract sees `msg.sender == whitelisted_address`. One phished signature becomes a permanent gateway for unlimited actors.
+- **FP:** Access control rejects delegation designator prefix (`0xef0100`). Whitelist requires per-call signature, not just address check.
+
+
+**285. Missing Slippage Protection on Vault Withdraw/Redeem**
+
+- **D:** ERC4626 `withdraw`/`redeem` accept no slippage parameter. Exchange rate changes between submission and execution (yield, donations, losses). Users receive fewer assets or burn more shares than expected.
+- **FP:** Fixed 1:1 exchange rate. Custom `withdrawWithSlippage` wrapper. Frontend simulation with revert. Loss-proof yield source.
+
+
+**286. Nonce Not Incremented on Reverted Execution**
+
+- **D:** Meta-tx nonce checked before execution but incremented only on success. Reverted inner call leaves nonce unchanged — same signed message replayable until it succeeds.
+- **FP:** Nonce incremented before execution (CEI). Incremented in both success/failure paths. Deadline-based expiry.
+
+
+**287. Minimum Lock Period Bypass via Position Modification**
+
+- **D:** Lock enforced on creation/removal but not `increaseLiquidity`/`decreaseLiquidity`. Attacker maintains minimal position, increases massively before profitable swap, decreases after — bypassing lock.
+- **FP:** Lock applies to any increase — `lastModifiedBlock` updated on every change. Fee accrual begins after lock for newly added liquidity.
+
+
+**288. Governance Precondition Manipulation**
+
+- **D:** Parameter updates have preconditions based on manipulable state (TVL, liquidity). Adversary inflates/deflates state to block updates — DoS on governance prevents critical changes (fee adjustments, security patches, oracle swaps).
+- **FP:** Preconditions use time-weighted/snapshot values. No state-dependent preconditions. Admin emergency override. Absolute thresholds, not relative to manipulable state.
+
+
+**289. Hook Callback Reentrancy for Fee Bypass**
+
+- **D:** User-controlled hook (beforeClaim, onReceive) fires mid-operation before fee accounting finalized. User reenters different contract via alternate path that skips fee deduction.
+- **FP:** Global reentrancy lock (not per-function). Hook fires after all state changes and fees finalized. Cross-contract mutex.
+
+
+**290. Cross-Message Token Identity Mismatch**
+
+- **D:** Multi-hop/cross-chain flow uses user-controlled token fields per leg without cross-validation. Attacker deposits token A but encodes token B — destination withdraws contract's balance of B. Pattern: `depositedToken`, `swapFromToken`, `swapToToken`, `withdrawalToken` specified independently.
+- **FP:** `require(depositedToken == message.fromToken)` at deposit. Swap output validated against withdrawal token. Stateless relay holds no funds. Fields derived from on-chain state.
+
+
+**291. First-Swap Extraction on Newly Created Pools**
+
+- **D:** New pool with minimal liquidity — first significant swap is extremely fee-rich. Attacker front-runs by adding concentrated liquidity, captures outsized fees, removes. Extreme: initializes at skewed price, profits from arb correction.
+- **FP:** Minimum locked seed liquidity (Uniswap V2 `MINIMUM_LIQUIDITY`). Fee ramp-up for new pools. Anti-sniping delay on creation.
+
+
+**292. Self-Delegation Doubles Voting Power**
+
+- **D:** Self-delegation adds votes to delegate (self) without subtracting undelegated balance — power counted twice: held tokens + delegated votes.
+- **FP:** Delegation subtracts from holder's direct balance. Self-delegation is no-op or explicitly handled. OZ Votes used.
+
+
+**293. MEV Withdrawal Before Bad Debt Socialization**
+
+- **D:** External event (liquidation, exploit, depeg) causes vault loss. MEV actor observes pending loss-causing tx in mempool and front-runs a withdrawal at pre-loss share price, leaving remaining depositors to absorb the full loss.
+- **FP:** Withdrawals require time-delayed request queue (epoch-based or cooldown). Loss realization and share price update are atomic. Private mempool used for liquidation txs.
+
+
+**294. Empty Swap Path Bypasses Token Validation**
+
+- **D:** Empty swap data/zero-length path returns input amount without swapping — and without validating input == output token. Attacker skips swap, receives output token from contract's balance. Pattern: `if (swapData.length == 0) return amount;` without `require(fromToken == toToken)`.
+- **FP:** Empty path enforces `require(fromToken == toToken)`. Swap mandatory. Reverts on empty data. Post-swap balance delta check.
+
+
+**295. Sentinel / Placeholder Address Operations**
+
+- **D:** Code branches on sentinel (`address(0)`, `0xEeEe...`, `type(uint256).max`) for ETH/special cases. Special branch omits validations the normal branch performs. Also: ERC20 calls on sentinel — high-level reverts (no code), low-level succeeds silently.
+- **FP:** Sentinel branch has equivalent validation. No ERC20 calls on sentinels. WETH wrapping instead of dual-path. Early detection routes to independent handler.
+
+
+**296. EIP-7702 Delegation Persists on Transaction Revert**
+
+- **D:** Delegation designator is set BEFORE transaction execution. If tx body reverts, delegation is NOT rolled back — EOA permanently has new code despite reverted state changes.
+- **FP:** Delegation requires EOA holder's explicit signature. Wallet UI shows active delegation status.
+
+
+**297. Open Interest Tracked with Pre-Fee Position Size**
+
+- **D:** OI incremented by full position size before fee deduction. Actual exposure < recorded OI. Permanently inflated OI hits caps, blocking new positions.
+- **FP:** OI incremented by post-fee size. OI decremented on close by same amount used at open.
+
+
+**298. Admin Parameter Change During Active Multi-Step Operation**
+
+- **D:** Multi-step operation (auction, epoch, bridge transfer, pending callback) spans multiple blocks. Admin setter takes effect mid-operation — later steps use new value, or dependency swap makes pending callback unfulfillable. Pattern: `setOracle(new)` while old oracle's callback pending.
+- **FP:** Setter blocked while operation active. Operation snapshots config at start. Pending callbacks resolved before dependency swap. Changes queued for next boundary.
+
+
+**299. Interest Accrual Rounds to Zero but Timestamp Advances**
+
+- **D:** `interest = rate * timeDelta / SECONDS_PER_YEAR` rounds to zero for small `timeDelta`, but `lastAccrualTime` still advances — fractional interest permanently lost.
+- **FP:** Accumulator uses sufficient precision (RAY = 1e27). `lastAccrualTime` only advances when interest > 0.
+
+
+**300. Oracle Extractable Value (OEV) Liquidation Leakage**
+
+- **D:** Liquidation callable by anyone with full `liquidationBonus` going to `msg.sender`. Oracle price update → MEV race to liquidate → value leaks from protocol to searchers with no recapture.
+- **FP:** OEV-aware oracle (API3 OEV Network, Chainlink SVR). Liquidation bonus auctioned with proceeds to protocol. Dutch auction liquidation. Keeper priority window.
+
+
+**301. DoS via Reverting External Call in Loop**
+
+- **D:** Distribution/claim loops over dynamic list with external call per iteration. Any single revert (paused token, blacklisted recipient, illiquid pool) blocks entire function for all users.
+- **FP:** `try/catch` per iteration (skip on failure). Separate per-item withdrawal. Admin can remove problematic entries.
+
+
+**302. Intent Solver Collusion / Suboptimal Execution**
+
+- **D:** Intent-based protocol with no on-chain execution quality enforcement. Colluding solvers provide suboptimal fills and split extracted value. Pattern: `fillOrder(order, solverParams)` with no price benchmark.
+- **FP:** On-chain oracle comparison with max deviation. User `minOutput` enforced on-chain. Solver bond slashed for suboptimal execution.
+
+
+**303. Pause Modifier Blocks Liquidations**
+
+- **D:** `whenNotPaused` applied to all external functions including `liquidate()`. During pause, interest accrues and prices move but positions can't be liquidated — bad debt accumulates.
+- **FP:** Liquidation exempt from pause. Separate `pauseLiquidations` flag. Interest accrual also paused.
+
+
+**304. Capacity Competition Between Accounting Variables**
+
+- **D:** Multiple accounting variables (user shares, fee shares, rewards) share a common cap. One can fill the cap, making another permanently unfulfillable. Pattern: `maxDeposit = supplyCap - totalSupply` ignores pending fee shares — deposits fill cap, fees can never mint.
+- **FP:** `maxDeposit` accounts for all future obligations. Fee shares minted eagerly. Separate caps for user/protocol shares.
+
+
+**305. Position Reduction Triggers Liquidation**
+
+- **D:** Partial repay/withdrawal creates intermediate state below liquidation threshold — bot liquidates before atomic completion. Health check applied to intermediate, not final state.
+- **FP:** Repay and collateral changes atomic. Health check on final state only. Grace period after modification.
+
+
+**306. Checkpoint Overwrite on Same-Block Operations**
+
+- **D:** Multiple delegate/transfer operations in same block overwrite `_writeCheckpoint()` at same key — binary search returns incomplete checkpoint, losing intermediate state.
+- **FP:** Same-block operations accumulate into existing checkpoint. Off-chain indexer used.
+
+
+**307. msg.value vs Computed Amount Mismatch**
+
+- **D:** Payable function computes `netAmount` after fees but forwards full `msg.value` downstream. Or trusts user-supplied `amount` without `require(msg.value == amount)`.
+- **FP:** `require(msg.value == expectedAmount)` at entry. Fee-adjusted amount used consistently. Excess refunded.
+
+
+**308. ERC4626 maxDeposit vs Actual Deposit Method Mismatch**
+
+- **D:** Vault queries `maxDeposit()` but deposits via `mint()` (or vice versa). Per ERC4626, `maxDeposit` governs `deposit()` and `maxMint` governs `mint()` — limits may differ. Same for withdrawal: `convertToAssets(maxRedeem(...))` instead of `maxWithdraw(...)` overstates amount (excludes fees/slippage).
+- **FP:** Method-matched queries (`maxMint` for `mint`, `maxDeposit` for `deposit`). `previewWithdraw`/`previewRedeem` for estimates. Underlying `max*` verified consistent.
+
+
+**309. Delegation to address(0) Blocks Token Transfers**
+
+- **D:** Delegating to `address(0)` causes `_update` hooks to revert modifying zero-address checkpoint. All transfers/burns for that holder permanently revert.
+- **FP:** Delegation to `address(0)` treated as undelegation. Hook skips checkpoint when delegate is zero. OZ Votes handles this.
+
+
+**310. FIFO Withdrawal Ordering Degrades Yield**
+
+- **D:** Aggregator vault withdraws from sub-vaults in fixed FIFO order, depleting highest-APY vaults first. Remaining capital concentrates in lowest-yield positions, reducing overall returns for all depositors.
+- **FP:** Withdrawal ordering sorted by APY ascending (lowest-yield first). Dynamic rebalancing after withdrawals. Single underlying vault (no ordering issue).
+
+
+**311. Emission Distribution Before Period Update**
+
+- **D:** `distribute()` reads token balance before `updatePeriod()` mints new emissions. Rewards arrive after distribution — idle until next cycle, underpaying current period.
+- **FP:** `updatePeriod()` called before `distribute()`. Emissions pre-funded before distribution window.
+
+
+**312. Same-Block Vote-Transfer-Vote**
+
+- **D:** Governance reads voting power at current block. User votes, transfers tokens to second wallet, votes again — doubling effective weight in same block.
+- **FP:** `getPastVotes(block.number - 1)` or proposal-creation snapshot. Voting power locked on first vote. ERC20Votes with checkpoints.
+
+
+**313. Pending Async Callback with Dependency Swap**
+
+- **D:** Contract requests async operation (randomness, oracle, cross-chain message) fulfilled via callback. Dependency swapped before callback arrives — new provider can't fulfill old request, old rejected as unregistered. Request stuck permanently. Pattern: `setProvider(new)` while `pendingRequestId != 0`.
+- **FP:** Swap blocked while requests pending. Callback validates request ID, not sender. Transition fulfills/cancels pending before registering new provider. Timeout for stuck requests.
+
+
+**314. Generalized Frontrunner on Permissionless Value Functions**
+
+- **D:** Value-extracting function (liquidation, reward claim) pays `msg.sender` with no access control, auction, or commit-reveal. Searcher always captures by frontrunning. Pattern: `token.transfer(msg.sender, bonus)` in permissionless external function.
+- **FP:** Keeper priority window. Dutch auction. Commit-reveal with caller binding. Value returned to protocol/affected user.
+
+
+**315. Reward Snapshot JIT (Same-Block Deposit-Withdraw for LP Rewards)**
+
+- **D:** LP rewards accrue based on instantaneous liquidity share, not time-weighted contribution. Attacker adds massive liquidity before accrual, captures disproportionate share, removes after.
+- **FP:** Time-weighted liquidity (`rewardPerLiquiditySecond` accumulator). Minimum staking duration. Previous-block snapshots.
+
+
+**316. EIP-7702 Cross-Chain Authorization Replay**
+
+- **D:** Authorization tuple with `chain_id = 0` valid on ALL EVM chains supporting EIP-7702. Each chain has independent nonce — same signature replayed across L1, rollups, testnets to delegate victim's EOA everywhere.
+- **FP:** Authorization signed with explicit `chain_id != 0`. Delegate contract checks `block.chainid`.
+
+
+**317. EIP-7702 Storage Collision on Redelegation**
+
+- **D:** EOA redelegates from Contract A to Contract B. Storage persists and is reinterpreted under B's layout — corruption, privilege escalation, or fund loss.
+- **FP:** ERC-7201 namespaced storage used. ERC-7779 redelegation process followed. Delegate has no persistent storage dependency.
+
+
+**318. Cached Reward Debt Not Reset After Claim**
+
+- **D:** After `claimRewards()`, `pendingReward`/`rewardDebt` not zeroed. Next claim pays full cached amount again — double payout.
+- **FP:** `pendingReward[user] = 0` after transfer. `rewardDebt` recalculated from current balance and accumulator.
+
+
+**319. Borrower Front-Runs Liquidation**
+
+- **D:** Borrower front-runs `liquidate()` with minimal repayment/top-up to push health above threshold, then re-borrows after liquidation fails. Repeatable indefinitely.
+- **FP:** Flash-loan-resistant health check (same-block deposit excluded). Minimum repayment cooldown. Dutch auction liquidation.
+
+
+**320. Protocol Fee Inflates Reward Accumulator**
+
+- **D:** Treasury fee processed through same `rewardPerToken` accumulator as staker rewards. Accumulator increments as if all goes to stakers — `earned()` exceeds contract balance.
+- **FP:** Fee deducted before accumulator: `rewardPerToken += (reward - fee) / totalStaked`. Separate fee accounting.
+
+
+**321. EIP-7702 Delegation Initialization Front-Run**
+
+- **D:** EOA delegates to smart wallet requiring separate `initialize(owner)` call. Attacker front-runs with victim's authorization, calls `initialize()` first — takes ownership of EOA's wallet and assets.
+- **FP:** Delegation and initialization bundled atomically. Owner derived from authorization signature via `ecrecover`. No permissionless `initialize()` step.

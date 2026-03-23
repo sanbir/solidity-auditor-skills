@@ -22,16 +22,16 @@ _Portrayed below: running the skill in a terminal workflow_
 
 ```bash
 /solidity-auditor
-/solidity-auditor deep
+/solidity-auditor deep          # adds DeFi protocol agent (opus)
 /solidity-auditor src/Vault.sol src/Router.sol
 /solidity-auditor --file-output
 ```
 
 ## Coverage
 
-- **283 attack vectors** tuned for EVM smart-contract security
-- **Parallel scan agents** for rapid first-pass triage
-- **Deep mode** for adversarial reasoning and protocol-specific analysis
+- **321 attack vectors** tuned for EVM smart-contract security
+- **8 specialized parallel agents** (vector-scan, math-precision, access-control, economic-security, execution-trace, invariant, periphery, first-principles)
+- **Deep mode** adds DeFi protocol analysis (opus)
 
 ## What It Looks For
 
