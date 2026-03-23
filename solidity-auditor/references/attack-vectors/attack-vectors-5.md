@@ -1,4 +1,4 @@
-229 total attack vectors — Extended patterns from DeFi protocol analysis, L2 considerations, behavioral vulnerabilities, EIP-7702, restaking, and modern attack surfaces
+283 total attack vectors
 
 **168. L2 Sequencer Grace Period Missing**
 
@@ -386,3 +386,273 @@
 
 - **D:** Contract participates in a native ETH flow (direct deposits, unwrap-to-ETH withdrawals, auction refunds, keeper payouts) but lacks a compatible `receive()` / payable fallback path, or assumes recipients can always accept ETH. Funds become stuck, user actions revert, or protocol state advances while value transfer fails. This shows up frequently in vaults, routers, auction houses, and refund paths that mix ERC-20 and ETH handling.
 - **FP:** Contract has an explicit payable receive path when native ETH is part of the design. Outbound ETH sends use checked `call{value: ...}` with fallback accounting or pull-payment recovery. Native and ERC-20 code paths are separated clearly and tested against smart-contract recipients (Safe, proxies, multisigs) as well as EOAs.
+
+**230. Algorithmic Complexity Gas DoS**
+
+- **D:** Nested loops, combinatorial matching, or recursive computation with superlinear gas cost (O(n²), O(2ⁿ)). At production scale, execution exceeds block gas limit, bricking the function.
+- **FP:** O(n) or O(n log n) algorithm. Input capped (`require(n <= MAX)` gas-tested). Computation paginated/batched. Off-chain compute with on-chain verification.
+
+**231. Blacklist and Whitelist Not Mutually Exclusive**
+
+- **D:** Address holds both `BLACKLISTED` and `WHITELISTED` roles. Whitelist-gated paths don't check blacklist — blacklisted address bypasses restrictions via whitelist.
+- **FP:** Adding to one auto-removes from other. Single enum role per address. Both checks applied on every restricted path.
+
+**232. Cross-Chain Sandwich via Bridge Parameter Exposure**
+
+- **D:** Bridge tx on source chain exposes destination swap params (`amountOutMin`, token, amount) in plaintext. Attacker frontruns on destination L2 to manipulate pool, backruns after bridge tx executes.
+- **FP:** Encrypted/committed bridge payloads. Destination swap recalculates slippage via oracle. Intent-based bridge (solver fills off-chain).
+
+**233. Dead Code After Return Statement**
+
+- **D:** Critical state update or validation placed after `return` — unreachable. Failures undetected, events never emitted, state never updated.
+- **FP:** All critical logic precedes `return`. Compiler unreachable-code warnings addressed.
+
+**234. Deprecated Gauge Blocks Claiming Accrued Rewards**
+
+- **D:** Killing/deprecating gauge blocks `claimReward()` for already-accrued, unclaimed rewards — users who earned before deprecation cannot retrieve.
+- **FP:** Kill stops future accrual only — claim remains active for pre-kill balances. Emergency claim bypasses active check.
+
+**235. Dutch Auction Price Decay Underflow**
+
+- **D:** `currentPrice = startPrice - (decayRate * elapsed)`. Past zero-point: underflow reverts (0.8+) or wraps to `type(uint256).max` (<0.8). Auction unfinishable.
+- **FP:** Floor price via `min()` or ternary at duration boundary. Reserve price enforced.
+
+**236. EIP-7702 Code Inspection Opcode Invalidation**
+
+- **D:** `extcodesize`, `extcodehash`, `extcodecopy` on delegated EOA operate on the 23-byte `0xef0100` delegation stub, not the delegate's code. `isContract()` checks misroute delegated EOAs. `extcodehash` comparisons against known implementation hashes fail. Proxy detection and ERC-1167 clone verification return unexpected results.
+- **FP:** No security-critical branching on `extcodesize`/`extcodehash`. Uses `CODESIZE`/`CODECOPY` within execution context (which follow delegation) rather than `EXT*` variants.
+
+**237. EIP-7702 Dual Signature Validation Confusion**
+
+- **D:** Delegated EOA supports both ECDSA (private key) and ERC-1271 (`isValidSignature` from delegate). Protocol checking only one path lets attacker exploit the other. Signature replay across redelegation — message signed under Delegate A interpreted differently by Delegate B.
+- **FP:** OZ `SignatureChecker.isValidSignatureNow` used. ERC-1271 checked first for accounts with code, ECDSA fallback for codeless. Signatures include delegate address in EIP-712 domain.
+
+**238. EIP-7702 ERC-721/ERC-1155 Callback Revert on Delegated EOA**
+
+- **D:** `safeTransferFrom` to delegated EOA triggers `onERC721Received`/`onERC1155Received` (recipient has code). If delegate doesn't implement callback, transfer reverts — breaks distribution loops and airdrops.
+- **FP:** Uses `transferFrom` (no callback). Fallback path on callback failure. Skip-and-accrue pattern.
+
+**239. EIP-7702 tx.origin == msg.sender Bypass**
+
+- **D:** `require(tx.origin == msg.sender)` as EOA gate or reentrancy guard. Delegated EOA passes check while executing arbitrary contract logic — enables flash loans, atomic governance manipulation, and reentrancy through "EOA-only" functions.
+- **FP:** Additional `require(msg.sender.code.length == 0)` check (delegated EOAs have 23-byte `0xef0100` stub). Function protected by time-lock, multi-sig, or past-block snapshot.
+
+**240. ERC4626 convertToAssets Used Instead of previewWithdraw**
+
+- **D:** Integration calls `convertToAssets(shares)` to estimate withdrawal proceeds — excludes fees/slippage per spec. Downstream logic (health checks, rebalancing) operates on inflated values.
+- **FP:** `previewWithdraw()`/`previewRedeem()` used for estimates. No withdrawal fees. Fee delta accounted separately.
+
+**241. ERC4626 maxDeposit Returns Non-Zero When Paused**
+
+- **D:** `maxDeposit()` returns `type(uint256).max` when paused. Integrators read "deposits accepted," attempt deposit, revert. Per ERC4626, must return 0 when deposits would revert.
+- **FP:** `maxDeposit()` returns 0 when paused. Integrators use `try deposit()`.
+
+**242. Emergency Mode State Machine Incompleteness**
+
+- **D:** Emergency mode pauses operations but accrual continues (rewards, interest, fees). On exit, accumulated state not reconciled — stuck funds. Also: emergency withdrawal omits cleanup of associated records (staking, reward debt, queue), leaving orphaned state.
+- **FP:** Emergency freezes all accrual. Exit reconciles before resuming. Emergency withdrawal atomically cleans associated records. Invariants re-validated on exit.
+
+**243. Expired Oracle Version Silently Assigned Previous Price**
+
+- **D:** In request-commit oracle patterns (Pyth, keepers), expired/unfulfilled request assigned last valid price instead of reverting. Pending orders execute at stale prices.
+- **FP:** Expired versions return `price = 0` or `valid = false`, forcing cancellation. Staleness threshold per-request. Fallback oracle.
+
+**244. False Existence Detection via Balance Check at Computed Address**
+
+- **D:** Contract checks pool/pair existence via `balanceOf()` at computed CREATE2 address. Pre-sent tokens make `balanceOf > 0` before deployment — logic assumes pool exists, attempts swap, reverts.
+- **FP:** Existence via factory: `factory.getPair(A, B) != address(0)`. `code.length > 0` checked. Pool verified by calling pool-specific function (`getReserves()`, `token0()`).
+
+**245. Fixed-End Auction Last-Block Sniping**
+
+- **D:** On-chain auction with fixed `endBlock`/`endTime` and no extension. Validator places winning bid in final block, censors competitors. Pattern: `require(block.timestamp <= endTime)` without anti-snipe extension.
+- **FP:** Auction extends on late bids. Candle auction (random end). Sealed-bid second-price. Batch/uniform-price clearing.
+
+**246. Funding Rate Derived from Single Trade Price**
+
+- **D:** Perp funding rate uses last trade price as mark. Single self-trade at extreme price skews funding — attacker profits on opposing position.
+- **FP:** Mark from TWAP or external oracle. Funding rate capped per period. VWAP used.
+
+**247. JIT Liquidity on Deterministic TWAMM Virtual Order Execution**
+
+- **D:** TWAMM virtual orders execute at deterministic intervals with publicly readable sale rates. Attacker adds concentrated liquidity before execution, captures fees from predictable flow, removes immediately. No mempool needed — timing fully on-chain.
+- **FP:** Time-weighted fee discount for liquidity added within execution window. Execution boundary randomized. Same-block positions excluded from TWAMM fee capture.
+
+**248. LST Redemption-Rate vs Market-Price Divergence**
+
+- **D:** LST collateral valued at protocol redemption rate (`stETH.getPooledEthByShares()`) while market trades at discount. Borrower posts overvalued collateral, borrows against inflated value. During stress, redemption rate stays high while market drops — bad debt.
+- **FP:** Market price feed (Chainlink stETH/ETH) used. `min(redemptionRate, marketPrice)` for valuation. LTV haircut for historical deviation. Circuit breaker on divergence.
+
+**249. Loss-Versus-Rebalancing (LVR) in Constant-Function AMMs**
+
+- **D:** AMM with constant-function pricing and static fees. Searchers continuously arbitrage stale pool price against external markets, extracting from LPs on every price movement. Concentrated liquidity amplifies extraction.
+- **FP:** Dynamic fee adjusting for volatility (Uniswap V4 hooks). MEV-aware design (batch auctions, CoW AMM). Fee tier covers expected LVR for pair volatility.
+
+**250. Memory Struct Copy Not Written Back to Storage**
+
+- **D:** `MyStruct memory s = myMapping[key]` creates a copy — mutations don't persist. Also: internal function with `memory` parameter silently copies storage on call. Pattern: `_updatePosition(Position memory pos)` called with `positions[user]`.
+- **FP:** Uses `storage` keyword. Explicitly writes back: `myMapping[key] = s`. Internal function parameter declared as `storage`.
+
+**251. Permissionless accrueInterest Griefing**
+
+- **D:** Permissionless `accrueInterest()` called at short intervals — each computes zero interest (rounding) but advances timestamp, systematically suppressing accumulation.
+- **FP:** Minimum accrual interval enforced. Precision ensures per-block interest > 0. Access-restricted accrual.
+
+**252. Profit Tracking Underflow Blocks Withdrawals**
+
+- **D:** Vault tracks cumulative profit. Strategy loss exceeding recorded profit causes `totalProfit -= loss` to underflow (revert on 0.8+), bricking all withdrawals.
+- **FP:** Loss capped: `totalProfit -= min(loss, totalProfit)`. Signed integer for profit/loss. Per-strategy tracking.
+
+**253. Quorum Computed from Live Supply, Not Snapshot**
+
+- **D:** `quorum = totalSupply() * quorumBps / 10000` reads current supply. Attacker inflates supply after proposal creation, lowering effective quorum percentage.
+- **FP:** Quorum snapshotted at proposal creation. Fixed absolute quorum. Supply changes don't affect active proposals.
+
+**254. Self-Matched Orders Enable Wash Trading**
+
+- **D:** Order matching doesn't verify `maker != taker`. User submits both sides to farm rewards, inflate volume, bypass royalties, or extract fee rebates.
+- **FP:** `require(maker != taker)`. Volume rewards use time-weighted averages. Royalty enforced regardless of counterparty.
+
+**255. Timelock Anchored to Deployment, Not Action**
+
+- **D:** Timelock measured from deployment, not action queue time. Once initial delay elapses, all future actions execute instantly — permanent bypass.
+- **FP:** `executeAfter = block.timestamp + delay` set at queue time. OZ TimelockController.
+
+**256. TWAP Accumulator Not Updated During Sync or Skim**
+
+- **D:** `sync()`/`skim()` updates reserves but doesn't call `_update()` to advance TWAP accumulator. Stale TWAP enables manipulation via sync-then-trade.
+- **FP:** `sync()` calls `_update()` before overwriting reserves. TWAP from external oracle. Uniswap V3 `observe()` used.
+
+**257. Vault Harvest Front-Running**
+
+- **D:** `harvest()` claims yield and increases `totalAssets()` atomically, raising share price. Attacker deposits before harvest, withdraws after — captures yield without duration exposure.
+- **FP:** Yield distributed over time (drip/streaming). Deposit lock spans harvest cycle. Harvest via keeper in private mempool. Performance fee at harvest.
+
+**258. Withdrawal Queue Bricked by Zero-Amount Entry**
+
+- **D:** FIFO withdrawal queue hits cancelled/zeroed entry that causes `break` or revert instead of skip, permanently blocking all subsequent withdrawals.
+- **FP:** Queue skips zero-amount entries. Cancellation removes or marks entry processed. Linked list allows removal.
+
+**259. Withdrawal Queue Rate Lock-In Front-Run**
+
+- **D:** `requestWithdraw()` locks exchange rate at request time, not claim time. Attacker front-runs pending loss event (slashing, depeg), locks pre-loss rate. Remaining depositors absorb full loss.
+- **FP:** Conversion at claim time using worst of request/claim rate. Same-block deposit+request prevented. Loss realization atomic with share price update.
+
+**260. notifyRewardAmount Overwrites Active Reward Period**
+
+- **D:** `notifyRewardAmount(newAmount)` replaces current period — undistributed rewards silently lost, not carried forward.
+- **FP:** New notification adds remaining: `rewardRate = (newAmount + remaining) / duration`. Only callable by designated distributor with timelock.
+
+**261. Reward Rate Changed Without Settling Accumulator**
+
+- **D:** Admin updates emission rate without calling `updateReward()` first. New rate retroactively applied to entire elapsed period, overpaying or underpaying.
+- **FP:** Rate-change calls `updateReward()` before applying new rate. Modifier auto-settles on every state change.
+
+**262. Reward Accrual During Zero-Depositor Period**
+
+- **D:** Time-based reward distribution starts at vault deployment but no depositors exist yet. First depositor claims all rewards accumulated during the empty period regardless of deposit size or timing.
+- **FP:** Rewards only accrue when `totalSupply > 0`. Reward start time set on first deposit. Unclaimed pre-deposit rewards sent to treasury or burned.
+
+**263. Unclaimed Reward Tokens from Underlying Protocol**
+
+- **D:** Vault deposits into yield protocol (Morpho, Aave, Convex) that emits reward tokens but never calls `claim()`. Rewards accumulate inaccessibly in vault or underlying.
+- **FP:** Explicit `claimRewards()` harvests and distributes. Reward tokens tracked dynamically. Vault sweeps unexpected balances to treasury.
+
+**264. Vault Insolvency via Accumulated Rounding Dust**
+
+- **D:** Vault tracks `totalAssets` as a storage variable separate from `token.balanceOf(vault)`. Solidity's floor rounding on each deposit/withdrawal creates tiny overages — user receives 1 wei more than burned shares represent. Over many operations `totalAssets` exceeds actual balance, causing last withdrawers to revert.
+- **FP:** Rounding consistently favors the vault (round shares up on deposit, round assets down on withdrawal). OZ Math with `Rounding.Ceil`/`Rounding.Floor` applied correctly.
+
+**265. Adverse Selection — Passive LP Value Extraction via Selective JIT**
+
+- **D:** No time-weighting or lock on fee distribution. JIT providers enter only during high-fee moments and exit during adverse moves. Passive LPs bear 100% IL but share fees with JIT providers bearing zero IL.
+- **FP:** Fee share time-weighted by duration. Dynamic fee increases during volatility. Withdrawal cooldown makes selective entry costly.
+
+**266. Tick Crossing Fee Accounting Manipulation via JIT**
+
+- **D:** On tick crossing, `feesPerLiquidityOutside` flips (`global - outside`). JIT provider adds at tick boundary after fees accumulate but before crossing — flip credits position with pre-existing fees it didn't earn.
+- **FP:** `feesPerLiquidityInsideLast` set at creation; crossing correctly partitions pre/post fees. Same-block creation and crossing yield zero claimable.
+
+**267. Fee Accumulation Rounding Extraction via Large JIT Position**
+
+- **D:** `feesPerLiquidity += (feeAmount << 128) / totalLiquidity`. Large JIT position inflates `totalLiquidity` — per-unit increment rounds to zero for existing LPs while JIT provider captures truncated amount.
+- **FP:** Sufficient precision (Q128+) ensures rounding loss < 1 wei at realistic ratios. Protocol minimum fee increment.
+
+**268. Atomic JIT Liquidity via Flash Accounting**
+
+- **D:** Flash accounting / lock-callback allows add-liquidity + swap + remove-liquidity atomically with zero capital. No minimum hold duration or fee decay. Attacker adds concentrated liquidity at current tick, swap executes through it, liquidity removed — all in one callback.
+- **FP:** Minimum hold duration enforced. Fee share weighted by time-in-pool. Withdrawal fee on short-lived positions. Flash callback restricted from `updatePosition`.
+
+**269. Bridge Global Rate Limit Griefing**
+
+- **D:** Bridge enforces global throughput cap not segmented by user. Attacker fills limit bridging cheap tokens back and forth, blocking all legitimate users during cooldown.
+- **FP:** Per-user rate limits. Segmented by token/route. Whitelist for high-value transfers.
+
+**270. Governance Proposal Executable Before Voting Period Ends**
+
+- **D:** `execute()` checks quorum/majority but not `block.timestamp >= proposal.endTime`. Once quorum met, proposal executable immediately — cuts voting window short.
+- **FP:** `require(block.timestamp >= proposal.endTime)`. OZ Governor enforces `ProposalState.Succeeded`.
+
+**271. Idle Asset Dilution from Sub-Vault Deposit Caps**
+
+- **D:** Aggregator vault accepts deposits without checking sub-vault capacity. Excess assets sit idle earning zero yield but dilute share price for all depositors.
+- **FP:** `maxDeposit()` reflects combined sub-vault remaining capacity. Deposits revert when no capacity remains. Idle assets auto-routed to fallback yield.
+
+**272. Lazy Epoch Advancement Skips Reward Periods**
+
+- **D:** Epoch advances only on user interaction. No interaction = never advanced — rewards miscalculated or lost when next interaction retroactively applies to wrong epoch.
+- **FP:** Keeper advances epochs independently. Catch-up loop processes skipped epochs. Continuous (non-epoch) reward accrual.
+
+**273. Liquidated Position Continues Accruing Rewards**
+
+- **D:** Position liquidated (balance zeroed) but not removed from reward distribution. `rewardDebt` not reset — phantom rewards accrue or are locked permanently.
+- **FP:** Liquidation calls `_withdrawRewards()` before zeroing. Reward system checks `balance > 0` before accruing.
+
+**274. Liquidation Arithmetic Reverts at Extreme Price Drops**
+
+- **D:** Collateral drops 95%+ — `collateralNeeded = debt / price` exceeds available collateral, liquidation math overflows/reverts. Position unliquidatable, bad debt locked.
+- **FP:** `collateralSeized` capped at position's total. Full seizure with remaining bad debt socialized.
+
+**275. Liquidation Blocked by External Pool Illiquidity**
+
+- **D:** Liquidation swaps collateral for debt token via external DEX. Drained pool reverts swap, making liquidation impossible. Bad debt accumulates.
+- **FP:** Liquidation accepts collateral directly. Fallback path uses different DEX. Liquidator provides debt token.
+
+**276. Liquidation Discount Applied Inconsistently Across Code Paths**
+
+- **D:** One path calculates debt at face value, another applies discount. Mismatch causes underflow or leaves residual bad debt unaccounted.
+- **FP:** Discount applied consistently across all liquidation paths. Single source of truth for discounted value.
+
+**277. Loan State Transition Before Interest Settlement**
+
+- **D:** Repay sets loan to `Repaid` before interest settled. Accrual skips `Repaid` loans — accumulated interest permanently uncollectable.
+- **FP:** `settleInterest()` before state transition. `require(msg.value >= principal + accruedInterest)`.
+
+**278. No-Bid Auction Fails to Clear State**
+
+- **D:** Auction expires with no bids but finalization doesn't clear lien/escrow data — collateral locked with no return path or re-auction mechanism.
+- **FP:** No-bid finalization returns collateral and clears state. Auto re-auction. Timeout-based release.
+
+**279. Partial Redemption Fails to Reduce Tracked Total**
+
+- **D:** Partial redemption fill doesn't reduce `totalQueuedShares`/`totalPendingAssets` proportionally. Inflated total skews share price.
+- **FP:** Partial fill reduces tracked totals proportionally. Per-request tracking. Atomic full-or-nothing redemptions.
+
+**280. Repeated Liquidation of Same Position**
+
+- **D:** Liquidation doesn't flag position as processed. After partial liquidation, position still appears undercollateralized — second liquidator seizes collateral beyond intent.
+- **FP:** Position marked `liquidated` or deleted. `require(status != Liquidated)`. Post-liquidation health check.
+
+**281. Share Redemption at Optimistic Rate**
+
+- **D:** Shares redeemed at projected end-of-term rate rather than current realized rate. Early redeemers take more than proportional share — late redeemers find vault depleted.
+- **FP:** Redemption uses current realized rate (`totalAssets() / totalSupply()`). Withdrawal queue enforces proportional access. Early redemption penalty applied.
+
+**282. State Record Overwrite Without Existence Check**
+
+- **D:** Mapping entry (refund, withdrawal, order) written without checking if key occupied. Overwrites legitimate user's record — blocks claim, redirects funds, or poisons state. Pattern: `records[key] = newData` without `require(records[key].amount == 0)`.
+- **FP:** Existence check before write. Nonce/hash-based keys prevent collision. Append-only structure. Old entry processed before overwrite.
+
+**283. Withdrawal Rate Limit Bypassed via Share Transfer**
+
+- **D:** Per-address withdrawal limit bypassed by transferring shares to fresh addresses — each gets a fresh limit.
+- **FP:** Limit tracks underlying position, not address. Shares non-transferable or transfer resets allowance.

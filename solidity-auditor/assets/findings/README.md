@@ -1,5 +1,10 @@
 # Findings
 
-Audit reports are saved here when `--file-output` is used.
+**⚠️ Work in Progress — this feature is not ready yet.**
 
-Format: `{project-name}-audit-report-{YYYYMMDD-HHMMSS}.md`
+This directory holds two kinds of reports:
+
+- **Reports from previous `/solidity-auditor` runs** — written automatically as `{project-name}-pashov-ai-audit-report-{timestamp}.md` each time the skill runs.
+- **External audit reports** — drop any third-party or manual audit `.md` files here.
+
+On each run the skill reads every file in this directory and re-verifies whether previously reported issues still exist in the current code. Issues still present are carried forward with a "Previously reported — still present" note. Issues that are no longer present are silently skipped.

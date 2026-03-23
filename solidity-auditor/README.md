@@ -1,58 +1,49 @@
 # Solidity Auditor
 
-The ultimate AI-powered security audit skill for Solidity — 229 attack vectors, 5 parallel scan agents, adversarial reasoning, and DeFi protocol analysis.
+A security agent for **Solidity and EVM systems**.
 
 Built for:
 
-- **Solidity devs** who want a security check before every commit
-- **Security researchers** looking for fast wins before a manual review
-- **Auditors** who want systematic vector coverage as a first pass
+- **Solidity developers** who want fast security feedback before every commit
+- **Security researchers** who need a first pass over a codebase before manual review
+- **Auditors** who want broad attack-vector coverage before deeper protocol reasoning
 
-Not a substitute for a formal audit — but the most comprehensive AI check you can run.
+It is not a substitute for a formal audit. It is the fast pass you should never skip.
 
-## What's Inside
+## Demo
 
-- **229 attack vectors** across 5 reference files — covering reentrancy, access control, arithmetic, ERC token standards, proxies, cross-chain (LayerZero), DeFi protocols, L2 considerations, flash loans, oracle manipulation, assembly pitfalls, and more
-- **5 parallel vector-scan agents** — each assigned ~45 vectors, scanning the full codebase simultaneously
-- **Adversarial reasoning agent** (DEEP mode) — free-form exploit hunting using Feynman questioning, state inconsistency analysis, and invariant hunting
-- **DeFi protocol agent** (DEEP mode) — domain-specific checklists for lending, AMM/DEX, ERC-4626 vaults, staking, bridges, governance, proxies, and account abstraction (ERC-4337)
-- **False-positive gate** — every finding must pass 3 checks (concrete path, reachable entry point, no existing guard)
-- **Confidence scoring** — base 100 with deductions for privileged callers, partial paths, self-contained impact, token assumptions, and external preconditions
+_Portrayed below: running the skill in a terminal workflow_
+
+![Running solidity-auditor in terminal](../static/skill_pag.gif)
 
 ## Usage
 
 ```bash
-# Scan the full repo (default — 5 agents)
 /solidity-auditor
-
-# Full repo + adversarial reasoning + DeFi protocol analysis (7 agents)
 /solidity-auditor deep
-
-# Review specific file(s)
-/solidity-auditor src/Vault.sol
 /solidity-auditor src/Vault.sol src/Router.sol
-
-# Write report to a markdown file (terminal-only by default)
 /solidity-auditor --file-output
 ```
 
-## Constraints (optional)
+## Coverage
 
-Drop a `.pashov-skills-constraints.yaml` in your repo root to tell the skill what your codebase does and doesn't use. Agents will skip irrelevant attack vectors during triage, reducing noise and scan time.
+- **283 attack vectors** tuned for EVM smart-contract security
+- **Parallel scan agents** for rapid first-pass triage
+- **Deep mode** for adversarial reasoning and protocol-specific analysis
 
-```yaml
-tokens: [USDC, WETH]        # skip exotic-token vectors
-standards: [ERC20]           # skip ERC721/ERC1155/ERC4626 vectors
-cross_chain: false           # skip LayerZero/bridge vectors
-proxy_pattern: none          # none | transparent | uups | diamond | beacon
-oracle: chainlink            # chainlink | twap | pyth | custom | none
-account_abstraction: false   # skip ERC-4337 vectors
-```
+## What It Looks For
 
-All fields optional. Code overrides constraints.
+- authorization, ownership, and privileged-path mistakes
+- proxy, initializer, upgrade, and storage-collision bugs
+- reentrancy across functions, callbacks, hooks, and external integrations
+- oracle manipulation, liquidation, rounding, and accounting drift
+- permit, EIP-712, replay, and signature-validation mistakes
+- bridge, messaging, and cross-domain trust failures
+- exotic ERC-20 behaviors and unsafe integrations
+- low-level call, returndata, gas-griefing, and edge-case execution issues
 
-## Known Limitations
+## Tips
 
-**Codebase size.** Works best up to ~2,500 lines of Solidity. Past ~5,000 lines, triage accuracy and mid-bundle recall drop noticeably. For large codebases, run per module rather than everything at once.
-
-**What AI misses.** AI is strong at pattern matching — missing access controls, unchecked return values, known reentrancy shapes. It struggles with relational reasoning: multi-transaction state setups, specification/invariant bugs, cross-protocol composability, game-theory attacks, and off-chain assumptions. AI catches what humans forget to check. Humans catch what AI cannot reason about. You need both.
+- **Run it on the hot contracts you are actively changing.** Smaller scoped runs usually produce denser context and better findings.
+- **Re-run after every fix set.** Model output is non-deterministic, and second passes often surface different bugs.
+- **Use `deep` for DeFi, proxy-heavy, bridge, oracle, and smart-account systems.** Those architectures benefit most from the extra adversarial and protocol passes.
