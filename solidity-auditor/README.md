@@ -29,7 +29,7 @@ _Portrayed below: running the skill in a terminal workflow_
 
 ## Coverage
 
-- **321 attack vectors** tuned for EVM smart-contract security
+- **328 attack vectors** tuned for EVM smart-contract security
 - **8 specialized parallel agents** (vector-scan, math-precision, access-control, economic-security, execution-trace, invariant, periphery, first-principles)
 - **Deep mode** adds DeFi protocol analysis (opus)
 

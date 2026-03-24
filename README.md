@@ -49,7 +49,7 @@ The v3 refresh adopts the pashov-skills v2 8-agent architecture (vector-scan, ma
 
 | Skill | Description |
 | --- | --- |
-| [solidity-auditor](solidity-auditor/) | 8 specialized parallel agents (321 vectors) for Solidity security with broad EVM, DeFi, proxy, signature, bridge, and token-integration coverage. |
+| [solidity-auditor](solidity-auditor/) | 8 specialized parallel agents (328 vectors) for Solidity security with broad EVM, DeFi, proxy, signature, bridge, and token-integration coverage. |
 
 ---
 

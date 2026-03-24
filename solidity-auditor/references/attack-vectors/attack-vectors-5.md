@@ -1,4 +1,4 @@
-321 total attack vectors
+328 total attack vectors
 
 **168. L2 Sequencer Grace Period Missing**
 
@@ -888,3 +888,45 @@
 
 - **D:** EOA delegates to smart wallet requiring separate `initialize(owner)` call. Attacker front-runs with victim's authorization, calls `initialize()` first — takes ownership of EOA's wallet and assets.
 - **FP:** Delegation and initialization bundled atomically. Owner derived from authorization signature via `ecrecover`. No permissionless `initialize()` step.
+
+
+**322. Namespace / ID Reuse Across Subsystems**
+
+- **D:** Multiple subsystems populate the same identifier space (`positionId`, `vaultId`, `requestId`, `orderId`), but authorization and state transitions only validate the ID, not the originating subsystem. An ID created in subsystem A is accepted by subsystem B, bypassing assumptions about ownership or lifecycle.
+- **FP:** IDs are namespaced per subsystem, or every call validates both `id` and subsystem/type discriminator. Cross-subsystem direction table reviewed and impossible states rejected.
+
+
+**323. Compliance Bypass via Privileged Auth Transfer**
+
+- **D:** A privileged transfer primitive (`authTransfer`, `forceTransfer`, compliance-admin move) skips blacklist / sanction / allowlist checks by design, and a user-reachable path can indirectly invoke it. The calling wrapper assumes the privileged callee already enforced compliance, but it did not.
+- **FP:** Privileged transfer is reachable only from isolated admin flows. User-facing paths re-run the same compliance checks before invoking the privileged primitive. Trace from all external entry points to `authTransfer` / `forceTransfer` shows no user-controlled route.
+
+
+**324. Sentinel Collision on Exhausted Quota**
+
+- **D:** `0` or another sentinel means "unset" / "unlimited", but the same value is also reachable through normal exhaustion (`remaining = 0`). Once a finite quota decrements to the sentinel value, the contract interprets the exhausted state as unlimited and re-enables access.
+- **FP:** Exhausted state is represented separately from unset state (extra boolean, distinct enum, non-zero sentinel). Decrement path cannot transition into the meaning of "unlimited".
+
+
+**325. Mapping Default Value State Ambiguity**
+
+- **D:** Mapping default values (`0`, `false`, empty struct) are treated as "never initialized", but those same values are also valid initialized states. Attackers reset or route execution through the default state to re-trigger initialization, bypass one-time checks, or claim resources repeatedly.
+- **FP:** Initialization tracked with an explicit boolean / version field. Default value is never used as the sole signal for state existence. Distinct-state collision tests cover `never set` vs `set to zero`.
+
+
+**326. Self-Transfer Accounting / Delegation Distortion**
+
+- **D:** Code assumes `src != dst` during transfer or delegation accounting. When sender and receiver are the same address, before/after balance reconstruction, voting checkpoints, or fee logic updates both sides asymmetrically, minting phantom voting power or corrupting accounting.
+- **FP:** Self-transfer is an explicit no-op or has dedicated logic. Tests cover `from == to` for token, staking, and delegation flows. Balance / checkpoint deltas collapse to zero in the self-transfer case.
+
+
+**327. Dual ETH/WETH Input Path Ambiguity**
+
+- **D:** Function accepts native ETH (`msg.value > 0`) and also accepts WETH / wrapped-asset transfers on the same path. If both are provided simultaneously, accounting may credit both, wrap twice, or process inconsistent slippage / refund branches.
+- **FP:** ETH and WETH paths are mutually exclusive (`require(msg.value == 0 || tokenIn != WETH)`, etc.). Native path wraps exactly once, ERC20 path rejects non-zero `msg.value`, and tests cover both-supplied input.
+
+
+**328. Swap-and-Pop Moved Index Stale Reference**
+
+- **D:** List deletion uses swap-and-pop, but auxiliary state still points to the moved element's old index. Subsequent reads, deletes, or authorization checks operate on the wrong record, enabling corruption or unauthorized access to the moved item.
+- **FP:** Every swap-and-pop updates both the removed item's metadata and the moved item's index mapping atomically. No external references depend on unstable indices, or stable IDs are used instead.

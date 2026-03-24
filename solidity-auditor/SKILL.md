@@ -120,6 +120,6 @@ Before doing anything else, print this exactly:
       ██║  ██║╚██████╔╝██████╔╝██║   ██║   ╚██████╔╝██║  ██║
       ╚═╝  ╚═╝ ╚═════╝ ╚═════╝ ╚═╝   ╚═╝    ╚═════╝ ╚═╝  ╚═╝
 
-  321 attack vectors · 8 specialized agents · DeFi protocol analysis
+  328 attack vectors · 8 specialized agents · DeFi protocol analysis
 
 ```
