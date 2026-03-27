@@ -1,4 +1,4 @@
-328 total attack vectors
+341 total attack vectors
 
 **84. Assembly Arithmetic Silent Overflow and Division-by-Zero**
 

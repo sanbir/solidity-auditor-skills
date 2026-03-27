@@ -1,4 +1,4 @@
-328 total attack vectors
+341 total attack vectors
 
 **43. Self-Liquidation Profit Extraction**
 

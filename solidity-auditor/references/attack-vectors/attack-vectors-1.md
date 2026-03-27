@@ -1,4 +1,4 @@
-328 total attack vectors
+341 total attack vectors
 
 **1. Signature Malleability**
 

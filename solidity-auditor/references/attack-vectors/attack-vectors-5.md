@@ -1,4 +1,4 @@
-328 total attack vectors
+341 total attack vectors
 
 **168. L2 Sequencer Grace Period Missing**
 
@@ -930,3 +930,81 @@
 
 - **D:** List deletion uses swap-and-pop, but auxiliary state still points to the moved element's old index. Subsequent reads, deletes, or authorization checks operate on the wrong record, enabling corruption or unauthorized access to the moved item.
 - **FP:** Every swap-and-pop updates both the removed item's metadata and the moved item's index mapping atomically. No external references depend on unstable indices, or stable IDs are used instead.
+
+
+**329. ERC-1363 transferAndCall Reentrancy**
+
+- **D:** ERC-1363 tokens implement `transferAndCall`/`transferFromAndCall` which invoke `onTransferReceived` on the recipient. Protocols guarding only against ERC-777 hooks remain vulnerable to the same reentrancy surface via ERC-1363 callbacks, as the token standard is distinct and its hooks are not covered by ERC-777-specific guards.
+- **FP:** Protocol does not accept arbitrary ERC-20 tokens. `nonReentrant` covers all state-changing paths regardless of callback source. CEI pattern followed throughout.
+
+
+**330. Silent Modifier (if-Without-Revert Access Control Bypass)**
+
+- **D:** A Solidity modifier uses `if (msg.sender == admin) { _; }` instead of `require(msg.sender == admin)`. When a non-admin calls the function, the modifier body is skipped but the function still executes because there is no revert — the `_;` is simply never reached for non-admins, but execution continues past the modifier, silently granting access to anyone.
+- **FP:** Modifier uses `require`/`revert` instead of a bare `if`. The `if` pattern is intentionally used for optional side-effects (not access control).
+
+
+**331. Tautology in Require (Self-Comparison Validation Bypass)**
+
+- **D:** A `require()` statement compares a variable to itself (`require(sourceAddressesRoot == sourceAddressesRoot)`), which always evaluates to true. This is a copy-paste or typo error where the right-hand side should be a different variable (e.g., the computed/expected root). The validation is completely bypassed, allowing arbitrary inputs to pass proof verification.
+- **FP:** The comparison is intentionally tautological as a placeholder. The function is not security-critical.
+
+
+**332. Existence Check Misused as Ownership Check**
+
+- **D:** A function calls `_requireOwned(tokenId)` or similar to validate authorization, but the internal function only checks whether the token exists (has a non-zero owner), not whether `msg.sender` is that owner. Any user can call the function for any existing token, enabling unauthorized operations like splitting, burning, or transferring other users' positions.
+- **FP:** The existence check is intentional (function is meant to be callable by anyone for any token). A separate ownership check exists elsewhere in the call path.
+
+
+**333. Partial-Claim Timestamp Advance (Unclaimed Reward Forfeiture)**
+
+- **D:** When a claim/harvest function caps the claimed amount (via allowance, balance, or rate limit), the timestamp/checkpoint for future claims advances to `block.timestamp` even when `claimed < owed`. The unclaimed portion is permanently forfeited because the protocol believes it was already distributed. This silently burns user entitlements whenever a rate limit is hit.
+- **FP:** Protocol explicitly documents that unclaimed amounts above the cap are forfeited by design. The checkpoint only advances proportionally to the amount actually claimed.
+
+
+**334. Keeper Under-Incentivization (Maintenance Function Gas Economics)**
+
+- **D:** Protocol depends on external keepers calling maintenance functions (`accrueInterest()`, `updateRewards()`, `liquidate()`, `performUpkeep()`), but the gas cost of calling these functions exceeds the keeper's reward. When gas prices spike, keepers go offline, causing state to become stale. In lending protocols, this leads to bad debt accumulation from unliquidated positions during high-gas periods.
+- **FP:** Protocol has its own subsidized keeper network. Keeper incentives dynamically scale with gas costs. The maintenance function is not time-critical.
+
+
+**335. Timelock Queue Observation Exploit Window**
+
+- **D:** When a governance proposal to change a parameter (interest rate, collateral factor, oracle source, fee rate) is queued in a timelock, the window between queuing and execution is exploitable. Attackers monitor the timelock queue and front-run the parameter change — borrowing at the old collateral factor before it tightens, or depositing before a fee increase. Timelock queue flooding can also delay legitimate governance actions.
+- **FP:** The timelock delay is shorter than practical front-running opportunity. The parameter change has no user-exploitable arbitrage. Affected positions are automatically settled at new parameters upon execution.
+
+
+**336. Permit Nonce-DoS (Nonce Consumption Attack)**
+
+- **D:** An attacker front-runs a user's EIP-2612 permit by submitting the same signature first. The nonce is consumed on the attacker's transaction (no approval is granted to the attacker — the nonce just gets burned). The user's bundled `permit + action` transaction then reverts because the nonce is stale. Distinct from permit front-run DoS (#225) because no approval is granted — pure nonce consumption to grief time-sensitive operations like liquidation prevention or deadline-bound swaps.
+- **FP:** The `permit()` call is wrapped in `try/catch` with a fallback to pre-existing allowance. The nonce check has been removed or modified.
+
+
+**337. Short Address Attack (ABI Padding Exploit)**
+
+- **D:** An attacker uses an Ethereum address shorter than 20 bytes in raw transaction calldata. Solidity's ABI decoder right-pads the short address with zeros, causing it to consume bytes from the next parameter (typically the amount). This effectively multiplies the transfer amount by 256 for each missing byte.
+- **FP:** Transaction is sent through a standard wallet/library that validates address length before encoding. Contract uses Solidity ≥0.5 with strict ABI decoding that rejects malformed calldata at the decoder level.
+
+
+**338. Zero-Value Token Transfer Phishing (Address Poisoning)**
+
+- **D:** Attacker calls `transferFrom(victim, spoofedAddress, 0)` on an ERC-20 token, which succeeds without approval because the amount is zero. This injects a fake transaction into the victim's history showing a transfer to a vanity address that closely resembles a legitimate recipient (same first/last characters). Victims who copy-paste addresses from transaction history send funds to the attacker's lookalike address.
+- **FP:** Token reverts on zero-amount transfers (see vector #10). Wallet/explorer filters zero-value `transferFrom` events from transaction history display.
+
+
+**339. Unenforced Safety Mechanism (Written-But-Not-Read State)**
+
+- **D:** Safety-critical state variables (circuit breaker flags, pause states, emergency mode booleans, rate limit counters) are correctly written/updated but never checked in the code paths they are supposed to gate. The protocol has a `setPaused(true)` function that updates a `paused` storage variable, but the critical functions that should check `require(!paused)` simply do not read it — the safety mechanism exists in code but provides zero protection.
+- **FP:** The safety state is checked via a modifier that is applied but not visible in the immediate function body (e.g., inherited modifier). The variable is read via an assembly/low-level path that is not immediately obvious.
+
+
+**340. Override/Extension Mismatch (Inherited Security Property Loss)**
+
+- **D:** When a contract overrides or wraps a base contract's function, the override may preserve explicit guards (`require`, `revert`, access control) but silently drop implicit structural properties (storage key schemes, ordering assumptions, aggregation granularity). For example, a base contract uses composite storage keys `keccak256(user, epoch)` for isolation, but the override switches to `mapping(user => value)`, losing epoch isolation. Explicit checks all pass but the structural security property is gone.
+- **FP:** Override was intentionally designed to change the structural property (documented). The structural property is not security-relevant in the derived context.
+
+
+**341. Comment-Formula Divergence (Code-Comment Mismatch in Financial Math)**
+
+- **D:** Inline comments describe one formula (e.g., `// fee = amount * rate / total`) but the adjacent code implements a different formula (e.g., `fee = amount / total * rate`). When the comment was written as specification and the code was written differently due to refactoring or copy-paste error, the divergence creates a precision loss or economic bug. The comment serves as evidence of developer intent, making the code provably wrong.
+- **FP:** The comment is outdated documentation that was never updated (informational, not a bug). Both formulas produce identical results for all valid inputs.

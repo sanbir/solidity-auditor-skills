@@ -1,4 +1,4 @@
-328 total attack vectors
+341 total attack vectors
 
 **126. Missing chainId (Cross-Chain Replay)**
 
